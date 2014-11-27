@@ -38,37 +38,48 @@ public class RailStations extends JavaPlugin implements Listener {
 		Vehicle cart = event.getVehicle();
 		if ( !minecartEntities.contains(cart.getType()) ) { return; }
 		
-		Location here = cart.getLocation();
-		if (!isLocked(cart)) {
-			if ( !tryLock(cart) ) { return; }
+		boolean locked = isLocked(cart);
+		if (!locked) {
+			locked = tryLock(cart);
+			if ( !locked ) { return; }
 		}
-		if (isLocked(cart)) {
+		if (locked) {
 			cart.setVelocity(new Vector()); // 0 vector
+			Location here = cart.getLocation();
 			here.setX( here.getBlockX() + 0.5 );
 			here.setZ( here.getBlockZ() + 0.5 );
-			Entity passenger = cart.getPassenger();
-			if (passenger != null) {
-				// Teleporting the cart won't work while it has a passenger.
-				/* The brief disembark is noticeable for players the first tick this happens.
-				There might be a way to prevent that. */
-				Location seated = passenger.getLocation();
-				seated.setX(here.getX());
-				seated.setZ(here.getZ());
-				cart.eject();
-				passenger.teleport(seated); // create the illusion that the passenger hasn't moved
-				cart.teleport(here);
-				cart.setPassenger(passenger);
-			} else {
-				cart.teleport(here);
-			}
+			/* The brief disembark is noticeable for players the first tick this happens.
+			There might be a way to prevent that. */
+			moveMinecart(cart, here);
 		}
 	}
 	
 	// TODO: Add handler for
 	// http://jd.bukkit.org/rb/doxygen/de/d55/classorg_1_1bukkit_1_1event_1_1vehicle_1_1VehicleDamageEvent.html
 	
-	private void boostMinecart() {
-		
+	private void boostMinecart(Vehicle cart, int x, int z) {
+		Location startPos = cart.getLocation();
+		startPos.add(x * 0.4, 0, z * 0.4);
+		Vector startVel = new Vector(x * 20, 0, z * 20);
+		cart.setMetadata("locked", new FixedMetadataValue(this, false));
+		moveMinecart(cart, startPos);
+		cart.setVelocity(startVel);
+	}
+	
+	private void moveMinecart(Vehicle cart, Location to) {
+		Entity passenger = cart.getPassenger();
+		if (passenger != null) {
+			// Teleporting the cart won't work while it has a passenger.
+			Location seated = passenger.getLocation();
+			seated.setX(to.getX());
+			seated.setZ(to.getZ());
+			cart.eject();
+			passenger.teleport(seated); // create the illusion that the passenger hasn't moved
+			cart.teleport(to);
+			cart.setPassenger(passenger);
+		} else {
+			cart.teleport(to);
+		}
 	}
 	
 	private boolean isLocked(Vehicle cart) {
