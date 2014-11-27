@@ -4,6 +4,7 @@ import org.bukkit.plugin.java.JavaPlugin;
 
 import org.bukkit.Location;
 import org.bukkit.Material;
+import org.bukkit.World;
 import org.bukkit.entity.Entity;
 import org.bukkit.entity.EntityType;
 import org.bukkit.entity.Vehicle;
@@ -21,10 +22,15 @@ public class RailStations extends JavaPlugin implements Listener {
 	// Only supporting rideable minecarts for now
 	public static EnumSet<EntityType> minecartEntities =
 			EnumSet.of(EntityType.MINECART);
-	public static final int PASSENGER_LOCK_DELAY = 2;
 	
 	public void onEnable() {
 		getServer().getPluginManager().registerEvents(this, this);
+		for (World world : getServer().getWorlds()) {
+			for (Vehicle cart : world.getEntitiesByClass(Vehicle.class)) {
+				if ( !minecartEntities.contains(cart.getType()) ) { continue; }
+				tryLock(cart);
+			}
+		}
 	}
 	
 	@EventHandler
@@ -33,17 +39,8 @@ public class RailStations extends JavaPlugin implements Listener {
 		if ( !minecartEntities.contains(cart.getType()) ) { return; }
 		
 		Location here = cart.getLocation();
-		Material on = here.getBlock().getType();
-		Material beneath = here.clone().add(0, -1, 0).getBlock().getType();
 		if (!isLocked(cart)) {
-			// Start gauntlet
-			if ( !(on == Material.DETECTOR_RAIL && beneath == Material.GOLD_BLOCK) ) { return; }
-			double xInBlock = here.getX() - here.getBlockX();
-			if ( !(xInBlock - 0.5 <= 0.3) ) { return; }
-			double zInBlock = here.getZ() - here.getBlockZ();
-			if ( !(zInBlock - 0.5 <= 0.3) ) { return; }
-			// Gauntlet cleared!
-			cart.setMetadata("locked", new FixedMetadataValue(this, true));
+			if ( !tryLock(cart) ) { return; }
 		}
 		if (isLocked(cart)) {
 			cart.setVelocity(new Vector()); // 0 vector
@@ -81,5 +78,20 @@ public class RailStations extends JavaPlugin implements Listener {
 			}
 		}
 		return false;
+	}
+	
+	private boolean tryLock(Vehicle cart) {
+		Location here = cart.getLocation();
+		Material on = here.getBlock().getType();
+		Material beneath = here.clone().add(0, -1, 0).getBlock().getType();
+		
+		if ( !(on == Material.DETECTOR_RAIL && beneath == Material.GOLD_BLOCK) ) { return false; }
+		double xInBlock = here.getX() - here.getBlockX();
+		if ( !(xInBlock - 0.5 <= 0.3) ) { return false; }
+		double zInBlock = here.getZ() - here.getBlockZ();
+		if ( !(zInBlock - 0.5 <= 0.3) ) { return false; }
+		
+		cart.setMetadata("locked", new FixedMetadataValue(this, true));
+		return true;
 	}
 }
