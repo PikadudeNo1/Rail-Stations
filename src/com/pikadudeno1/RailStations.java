@@ -10,7 +10,11 @@ import org.bukkit.entity.EntityType;
 import org.bukkit.entity.Vehicle;
 import org.bukkit.event.EventHandler;
 import org.bukkit.event.Listener;
+import org.bukkit.event.block.Action;
+import org.bukkit.event.player.PlayerInteractEvent;
 import org.bukkit.event.vehicle.VehicleMoveEvent;
+import org.bukkit.material.MaterialData;
+import org.bukkit.material.Rails;
 import org.bukkit.metadata.FixedMetadataValue;
 import org.bukkit.metadata.MetadataValue;
 import org.bukkit.util.Vector;
@@ -54,11 +58,46 @@ public class RailStations extends JavaPlugin implements Listener {
 		}
 	}
 	
-	// TODO: Add handler for
-	// http://jd.bukkit.org/rb/doxygen/de/d55/classorg_1_1bukkit_1_1event_1_1vehicle_1_1VehicleDamageEvent.html
+	public static EnumSet<Action> riderUnlockOn =
+			EnumSet.of(Action.LEFT_CLICK_BLOCK, Action.LEFT_CLICK_AIR);
+	@EventHandler
+	public void riderUnlock(PlayerInteractEvent event) {
+		Entity rider = event.getPlayer();
+		Vehicle cart;
+		if (rider.getVehicle() instanceof Vehicle) {
+			cart = (Vehicle) rider.getVehicle();
+		} else {
+			return;
+		}
+		if (!( riderUnlockOn.contains(event.getAction()) && isLocked(cart) )) {
+			return;
+		}
+		event.setCancelled(true);
+		float facing = rider.getLocation().getYaw();
+		if (facing >= 315 || facing < 45) {
+			boostMinecart(cart, 0, 1);
+		}
+		else if (facing >= 45 && facing < 135) {
+			boostMinecart(cart, -1, 0);
+		}
+		else if (facing >= 135 && facing < 225) {
+			boostMinecart(cart, 0, -1);
+		}
+		else if (facing >= 225 && facing < 315) {
+			boostMinecart(cart, 1, 0);
+		}
+	}
 	
 	private void boostMinecart(Vehicle cart, int x, int z) {
 		Location startPos = cart.getLocation();
+		MaterialData nextBlockData = startPos.clone().add(x, 0, z)
+				.getBlock().getState().getData();
+		Rails nextRailData;
+		if (nextBlockData instanceof Rails) {
+			nextRailData = (Rails) nextBlockData;
+		} else {
+			return;
+		}
 		startPos.add(x * 0.4, 0, z * 0.4);
 		Vector startVel = new Vector(x * 20, 0, z * 20);
 		cart.setMetadata("locked", new FixedMetadataValue(this, false));
