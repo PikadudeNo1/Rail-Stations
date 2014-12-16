@@ -5,6 +5,7 @@ import org.bukkit.plugin.java.JavaPlugin;
 import org.bukkit.Location;
 import org.bukkit.Material;
 import org.bukkit.World;
+import org.bukkit.block.Block;
 import org.bukkit.entity.Entity;
 import org.bukkit.entity.EntityType;
 import org.bukkit.entity.Vehicle;
@@ -48,6 +49,7 @@ public class RailStations extends JavaPlugin implements Listener {
 			if ( !locked ) { return; }
 		}
 		if (locked) {
+			// Deal with the station block being destroyed
 			cart.setVelocity(new Vector()); // 0 vector
 			Location here = cart.getLocation();
 			here.setX( here.getBlockX() + 0.5 );
@@ -74,6 +76,7 @@ public class RailStations extends JavaPlugin implements Listener {
 		}
 		event.setCancelled(true);
 		float facing = rider.getLocation().getYaw();
+		if (facing < 0) { facing += 360; }
 		if (facing >= 315 || facing < 45) {
 			boostMinecart(cart, 0, 1);
 		}
@@ -92,13 +95,14 @@ public class RailStations extends JavaPlugin implements Listener {
 		Location startPos = cart.getLocation();
 		MaterialData nextBlockData = startPos.clone().add(x, 0, z)
 				.getBlock().getState().getData();
+		// If the next block is air, check the block under it
 		Rails nextRailData;
 		if (nextBlockData instanceof Rails) {
 			nextRailData = (Rails) nextBlockData;
 		} else {
 			return;
 		}
-		startPos.add(x * 0.4, 0, z * 0.4);
+		startPos.add(x * 0.6, 0, z * 0.6);
 		Vector startVel = new Vector(x * 20, 0, z * 20);
 		cart.setMetadata("locked", new FixedMetadataValue(this, false));
 		moveMinecart(cart, startPos);
@@ -131,15 +135,17 @@ public class RailStations extends JavaPlugin implements Listener {
 	}
 	
 	private boolean tryLock(Vehicle cart) {
+		// Try to capture cornering carts?
 		Location here = cart.getLocation();
-		Material on = here.getBlock().getType();
-		Material beneath = here.clone().add(0, -1, 0).getBlock().getType();
+		Block on = here.getBlock();
 		
-		if ( !(on == Material.DETECTOR_RAIL && beneath == Material.GOLD_BLOCK) ) { return false; }
+		if ( !(on.getType() == Material.DETECTOR_RAIL &&
+				on.getRelative(0, -1, 0).getType() == Material.GOLD_BLOCK) ) { return false; }
 		double xInBlock = here.getX() - here.getBlockX();
 		if ( !(xInBlock - 0.5 <= 0.3) ) { return false; }
 		double zInBlock = here.getZ() - here.getBlockZ();
 		if ( !(zInBlock - 0.5 <= 0.3) ) { return false; }
+		// Require that the detector rail lies flat on the gold block
 		
 		cart.setMetadata("locked", new FixedMetadataValue(this, true));
 		return true;
