@@ -50,9 +50,12 @@ public class RailStations extends JavaPlugin implements Listener {
 			if ( !locked ) { return; }
 		}
 		if (locked) {
-			// Deal with the station block being destroyed
-			cart.setVelocity(new Vector()); // 0 vector
 			Location here = cart.getLocation();
+			if (here.getBlock().getType() != Material.DETECTOR_RAIL) {
+				cart.setMetadata("locked", new FixedMetadataValue(this, false));
+				return;
+			}
+			cart.setVelocity(new Vector()); // 0 vector
 			here.setX( here.getBlockX() + 0.5 );
 			here.setZ( here.getBlockZ() + 0.5 );
 			/* The brief disembark is noticeable for players the first tick this happens.
