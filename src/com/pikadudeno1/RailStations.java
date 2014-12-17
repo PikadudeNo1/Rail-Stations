@@ -13,6 +13,7 @@ import org.bukkit.event.EventHandler;
 import org.bukkit.event.Listener;
 import org.bukkit.event.block.Action;
 import org.bukkit.event.player.PlayerInteractEvent;
+import org.bukkit.event.vehicle.VehicleCreateEvent;
 import org.bukkit.event.vehicle.VehicleMoveEvent;
 import org.bukkit.material.MaterialData;
 import org.bukkit.material.Rails;
@@ -60,6 +61,13 @@ public class RailStations extends JavaPlugin implements Listener {
 		}
 	}
 	
+	@EventHandler
+	public void minecartPlacement(VehicleCreateEvent event) {
+		Vehicle cart = event.getVehicle();
+		if ( !minecartEntities.contains(cart.getType()) ) { return; }
+		tryLock(cart);
+	}
+	
 	public static EnumSet<Action> riderUnlockOn =
 			EnumSet.of(Action.LEFT_CLICK_BLOCK, Action.LEFT_CLICK_AIR);
 	@EventHandler
@@ -93,13 +101,11 @@ public class RailStations extends JavaPlugin implements Listener {
 	
 	private void boostMinecart(Vehicle cart, int x, int z) {
 		Location startPos = cart.getLocation();
-		MaterialData nextBlockData = startPos.clone().add(x, 0, z)
-				.getBlock().getState().getData();
-		// If the next block is air, check the block under it
-		Rails nextRailData;
-		if (nextBlockData instanceof Rails) {
-			nextRailData = (Rails) nextBlockData;
-		} else {
+		Block nextBlock = startPos.clone().add(x, 0, z).getBlock();
+		if (nextBlock.getType() == Material.AIR) {
+			nextBlock = nextBlock.getRelative(0, -1, 0);
+		}
+		if ( !(nextBlock.getState().getData() instanceof Rails) ) {
 			return;
 		}
 		startPos.add(x * 0.6, 0, z * 0.6);
@@ -141,11 +147,11 @@ public class RailStations extends JavaPlugin implements Listener {
 		
 		if ( !(on.getType() == Material.DETECTOR_RAIL &&
 				on.getRelative(0, -1, 0).getType() == Material.GOLD_BLOCK) ) { return false; }
+		if ( ((Rails) on.getState().getData()).isOnSlope() ) { return false; }
 		double xInBlock = here.getX() - here.getBlockX();
 		if ( !(xInBlock - 0.5 <= 0.3) ) { return false; }
 		double zInBlock = here.getZ() - here.getBlockZ();
 		if ( !(zInBlock - 0.5 <= 0.3) ) { return false; }
-		// Require that the detector rail lies flat on the gold block
 		
 		cart.setMetadata("locked", new FixedMetadataValue(this, true));
 		return true;
