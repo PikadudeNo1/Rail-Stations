@@ -8,12 +8,15 @@ import org.bukkit.World;
 import org.bukkit.block.Block;
 import org.bukkit.entity.Entity;
 import org.bukkit.entity.EntityType;
+import org.bukkit.entity.Minecart;
+import org.bukkit.entity.Player;
 import org.bukkit.entity.Vehicle;
 import org.bukkit.event.EventHandler;
 import org.bukkit.event.Listener;
 import org.bukkit.event.block.Action;
 import org.bukkit.event.player.PlayerInteractEvent;
 import org.bukkit.event.vehicle.VehicleCreateEvent;
+import org.bukkit.event.vehicle.VehicleEntityCollisionEvent;
 import org.bukkit.event.vehicle.VehicleMoveEvent;
 import org.bukkit.material.MaterialData;
 import org.bukkit.material.Rails;
@@ -25,15 +28,11 @@ import org.bukkit.util.Vector;
  * @author Pikadude No. 1
  */
 public class RailStations extends JavaPlugin implements Listener {
-	// Only supporting rideable minecarts for now
-	public static EnumSet<EntityType> minecartEntities =
-			EnumSet.of(EntityType.MINECART);
 	
 	public void onEnable() {
 		getServer().getPluginManager().registerEvents(this, this);
 		for (World world : getServer().getWorlds()) {
-			for (Vehicle cart : world.getEntitiesByClass(Vehicle.class)) {
-				if ( !minecartEntities.contains(cart.getType()) ) { continue; }
+			for (Vehicle cart : world.getEntitiesByClass(Minecart.class)) {
 				tryLock(cart);
 			}
 		}
@@ -42,7 +41,7 @@ public class RailStations extends JavaPlugin implements Listener {
 	@EventHandler
 	public void minecartMotion(VehicleMoveEvent event) {
 		Vehicle cart = event.getVehicle();
-		if ( !minecartEntities.contains(cart.getType()) ) { return; }
+		if ( !(cart instanceof Minecart) ) { return; }
 		
 		boolean locked = isLocked(cart);
 		if (!locked) {
@@ -67,8 +66,21 @@ public class RailStations extends JavaPlugin implements Listener {
 	@EventHandler
 	public void minecartPlacement(VehicleCreateEvent event) {
 		Vehicle cart = event.getVehicle();
-		if ( !minecartEntities.contains(cart.getType()) ) { return; }
+		if ( !(cart instanceof Minecart) ) { return; }
 		tryLock(cart);
+	}
+	
+	@EventHandler
+	public void pushUnlock(VehicleEntityCollisionEvent event) {
+		Entity pusher = event.getEntity();
+		Vehicle cart = event.getVehicle();
+		if (!( pusher instanceof Player && !(cart.getPassenger() instanceof Player)
+				&& isLocked(cart) )) {
+			return;
+		}
+		Location difference = cart.getLocation().subtract(pusher.getLocation());
+		// It doesn't matter what Location object we call setDirection on
+		boostMinecart(cart, difference.setDirection( difference.toVector() ));
 	}
 	
 	public static EnumSet<Action> riderUnlockOn =
@@ -86,22 +98,25 @@ public class RailStations extends JavaPlugin implements Listener {
 			return;
 		}
 		event.setCancelled(true);
-		float facing = rider.getLocation().getYaw();
-		if (facing < 0) { facing += 360; }
-		if (facing >= 315 || facing < 45) {
+		boostMinecart(cart, rider.getLocation());
+	}
+	
+	private void boostMinecart(Vehicle cart, Location direction) {
+		float yaw = direction.getYaw();
+		if (yaw < 0) { yaw += 360; }
+		if (yaw >= 315 || yaw < 45) {
 			boostMinecart(cart, 0, 1);
 		}
-		else if (facing >= 45 && facing < 135) {
+		else if (yaw >= 45 && yaw < 135) {
 			boostMinecart(cart, -1, 0);
 		}
-		else if (facing >= 135 && facing < 225) {
+		else if (yaw >= 135 && yaw < 225) {
 			boostMinecart(cart, 0, -1);
 		}
-		else if (facing >= 225 && facing < 315) {
+		else if (yaw >= 225 && yaw < 315) {
 			boostMinecart(cart, 1, 0);
 		}
 	}
-	
 	private void boostMinecart(Vehicle cart, int x, int z) {
 		Location startPos = cart.getLocation();
 		Block nextBlock = startPos.clone().add(x, 0, z).getBlock();
